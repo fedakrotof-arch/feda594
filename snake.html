@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>🐍 Змейка  1�7 играть онлайн</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  
+  body {
+    background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+
+  h1 {
+    font-size: 28px;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #4caf50, #8bc34a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  .stats {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 14px;
+  }
+
+  .stat { text-align: center; }
+  .stat-value {
+    font-size: 26px;
+    font-weight: bold;
+    color: #4caf50;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  canvas {
+    background: #16213e;
+    border-radius: 12px;
+    border: 2px solid #2a3a5c;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 40px rgba(76,175,80,0.15);
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 60px 60px 60px;
+    grid-template-rows: 60px 60px;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .btn {
+    width: 60px;
+    height: 60px;
+    border: none;
+    border-radius: 12px;
+    background: #2a3a5c;
+    color: #4caf50;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s, background 0.15s;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  .btn:active {
+    transform: scale(0.92);
+    background: #3a4a6c;
+  }
+
+  .btn-up    { grid-column: 2; grid-row: 1; }
+  .btn-left  { grid-column: 1; grid-row: 2; }
+  .btn-down  { grid-column: 2; grid-row: 2; }
+  .btn-right { grid-column: 3; grid-row: 2; }
+
+  .restart-btn {
+    grid-column: 3; grid-row: 1;
+    width: 60px; height: 60px;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 20px;
+  }
+  .restart-btn:active { background: #c0392b; }
+
+  .hint {
+    margin-top: 14px;
+    color: #666;
+    font-size: 12px;
+    text-align: center;
+  }
+  .key {
+    display: inline-block;
+    background: #2a3a5c;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: #8bc34a;
+    font-weight: bold;
+    font-size: 11px;
+  }
+
+  @media (min-width: 700px) {
+    .controls { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🐍 Змейка</h1>
+<div class="subtitle">Собирай яблоки и расти</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value" id="score">0</div>
+    <div class="stat-label">Счёт</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="highScore">0</div>
+    <div class="stat-label">Рекорд</div>
+  </div>
+</div>
+
+<canvas id="game" width="400" height="400"></canvas>
+
+<div class="controls">
+  <button class="btn btn-up"    data-dir="up">▄1�7</button>
+  <button class="btn btn-left"  data-dir="left">◄1�7</button>
+  <button class="btn btn-down"  data-dir="down">▄1�7</button>
+  <button class="btn btn-right" data-dir="right">▄1�7</button>
+  <button class="btn restart-btn" id="restartBtn">ↄ1�7</button>
+</div>
+
+<div class="hint">
+  ПК: <span class="key">ↄ1�7</span> <span class="key">ↄ1�7</span> <span class="key">ↄ1�7</span> <span class="key">ↄ1�7</span> &nbsp; 1�7&nbsp;
+  Телефон: кнопки ниже или свайпы
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var highScoreEl = document.getElementById('highScore');
+
+  // --- Параметры игры ---
+  var CELL = 20;              // размер одной клетки
+  var COLS = canvas.width / CELL;   // 20 клеток по горизонтали
+  var ROWS = canvas.height / CELL;  // 20 клеток по вертикали
+
+  var snake, dir, nextDir, food, score, highScore, speed, gameOver, started, timer;
+
+  highScore = Number(localStorage.getItem('snakeHighScore') || 0);
+  highScoreEl.textContent = highScore;
+
+  // --- Инициализация ---
+  function init() {
+    snake = [
+      { x: 10, y: 10 },
+      { x: 9,  y: 10 },
+      { x: 8,  y: 10 }
+    ];
+    dir = { x: 1, y: 0 };
+    nextDir = { x: 1, y: 0 };
+    score = 0;
+    speed = 150;      // миллисекунд между шагами
+    gameOver = false;
+    started = false;
+    scoreEl.textContent = '0';
+    spawnFood();
+
+    if (timer) clearInterval(timer);
+    timer = setInterval(tick, speed);
+
+    draw();
+  }
+
+  // --- Появление еды в случайном месте ---
+  function spawnFood() {
+    while (true) {
+      var fx = Math.floor(Math.random() * COLS);
+      var fy = Math.floor(Math.random() * ROWS);
+      var onSnake = false;
+      for (var i = 0; i < snake.length; i++) {
+        if (snake[i].x === fx && snake[i].y === fy) {
+          onSnake = true;
+          break;
+        }
+      }
+      if (!onSnake) {
+        food = { x: fx, y: fy };
+        return;
+      }
+    }
+  }
+
+  // --- Один шаг игры ---
+  function tick() {
+    if (!started || gameOver) return;
+
+    // Применяем отложенное направление
+    if (nextDir.x !== -dir.x || nextDir.y !== -dir.y) {
+      dir = nextDir;
+    }
+
+    // Новая голова
+    var head = {
+      x: snake[0].x + dir.x,
+      y: snake[0].y + dir.y
+    };
+
+    // Столкновение со стеной
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+      endGame();
+      return;
+    }
+
+    // Столкновение с собой
+    for (var i = 0; i < snake.length; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) {
+        endGame();
+        return;
+      }
+    }
+
+    snake.unshift(head);
+
+    // Съели еду?
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      scoreEl.textContent = score;
+
+      // Ускорение каждые 50 очков
+      if (score % 50 === 0 && speed > 60) {
+        speed -= 10;
+        clearInterval(timer);
+        timer = setInterval(tick, speed);
+      }
+
+      spawnFood();
+    } else {
+      snake.pop();
+    }
+
+    draw();
+  }
+
+  // --- Конец игры ---
+  function endGame() {
+    gameOver = true;
+    clearInterval(timer);
+
+    if (score > highScore) {
+      highScore = score;
+      highScoreEl.textContent = highScore;
+      localStorage.setItem('snakeHighScore', highScore);
+    }
+
+    draw();
+  }
+
+  // --- Отрисовка ---
+  function draw() {
+    // Фон
+    ctx.fillStyle = '#16213e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Сетка
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (var i = 0; i <= COLS; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * CELL, 0);
+      ctx.lineTo(i * CELL, canvas.height);
+      ctx.stroke();
+    }
+    for (var j = 0; j <= ROWS; j++) {
+      ctx.beginPath();
+      ctx.moveTo(0, j * CELL);
+      ctx.lineTo(canvas.width, j * CELL);
+      ctx.stroke();
+    }
+
+    // Еда (яблоко)
+    drawApple(food.x, food.y);
+
+    // Змейка
+    for (var k = snake.length - 1; k >= 0; k--) {
+      var part = snake[k];
+      if (k === 0) {
+        drawHead(part.x, part.y);
+      } else {
+        drawBody(part.x, part.y, k);
+      }
+    }
+
+    // Экран старта
+    if (!started && !gameOver) {
+      drawOverlay('🐍', 'Нажми любую стрелку', 'или свайпни по экрану');
+    }
+
+    // Экран проигрыша
+    if (gameOver) {
+      drawOverlay('💀', 'Игра окончена', 'Счёт: ' + score + '   1�7  Нажми ↄ1�7');
+    }
+  }
+
+  function drawApple(gx, gy) {
+    var x = gx * CELL;
+    var y = gy * CELL;
+    var cx = x + CELL / 2;
+    var cy = y + CELL / 2;
+
+    // Свечение
+    ctx.save();
+    ctx.shadowColor = '#e74c3c';
+    ctx.shadowBlur = 12;
+
+    // Тело яблока
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 1, CELL * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Блик
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.arc(cx - 2, cy - 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Хвостик
+    ctx.strokeStyle = '#4caf50';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - CELL * 0.35);
+    ctx.lineTo(cx + 2, cy - CELL * 0.5);
+    ctx.stroke();
+  }
+
+  function drawHead(gx, gy) {
+    var x = gx * CELL;
+    var y = gy * CELL;
+
+    ctx.fillStyle = '#8bc34a';
+    roundRect(x + 1, y + 1, CELL - 2, CELL - 2, 6);
+
+    // Глаза в зависимости от направления
+    ctx.fillStyle = '#1a1a2e';
+    var eyeSize = 3;
+    var eyeOffset = 4;
+    var cx = x + CELL / 2;
+    var cy = y + CELL / 2;
+
+    var ex1, ey1, ex2, ey2;
+    if (dir.x === 1) {        // вправо
+      ex1 = cx + eyeOffset; ey1 = cy - 3;
+      ex2 = cx + eyeOffset; ey2 = cy + 3;
+    } else if (dir.x === -1) { // влево
+      ex1 = cx - eyeOffset; ey1 = cy - 3;
+      ex2 = cx - eyeOffset; ey2 = cy + 3;
+    } else if (dir.y === -1) { // вверх
+      ex1 = cx - 3; ey1 = cy - eyeOffset;
+      ex2 = cx + 3; ey2 = cy - eyeOffset;
+    } else {                   // вниз
+      ex1 = cx - 3; ey1 = cy + eyeOffset;
+      ex2 = cx + 3; ey2 = cy + eyeOffset;
+    }
+
+    ctx.beginPath();
+    ctx.arc(ex1, ey1, eyeSize, 0, Math.PI * 2);
+    ctx.arc(ex2, ey2, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBody(gx, gy, index) {
+    var x = gx * CELL;
+    var y = gy * CELL;
+
+    // Градиент от зелёного к тёмному по мере удаления от головы
+    var ratio = Math.min(index / 15, 1);
+    var r = Math.round(76 + (26 - 76) * ratio);
+    var g = Math.round(175 + (100 - 175) * ratio);
+    var b = Math.round(80 + (50 - 80) * ratio);
+
+    ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+    roundRect(x + 1, y + 1, CELL - 2, CELL - 2, 5);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawOverlay(icon, line1, line2) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.font = '48px Arial';
+    ctx.fillText(icon, canvas.width / 2, canvas.height / 2 - 30);
+
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = '#8bc34a';
+    ctx.fillText(line1, canvas.width / 2, canvas.height / 2 + 15);
+
+    ctx.font = '13px Arial';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText(line2, canvas.width / 2, canvas.height / 2 + 40);
+    ctx.textAlign = 'left';
+  }
+
+  // --- Управление с клавиатуры ---
+  document.addEventListener('keydown', function(e) {
+    var key = e.key;
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'W', 'A', 'S', 'D'].indexOf(key) !== -1) {
+      e.preventDefault();
+      if (!started) started = true;
+
+      if ((key === 'ArrowUp' || key === 'w' || key === 'W') && dir.y !== 1) {
+        nextDir = { x: 0, y: -1 };
+      } else if ((key === 'ArrowDown' || key === 's' || key === 'S') && dir.y !== -1) {
+        nextDir = { x: 0, y: 1 };
+      } else if ((key === 'ArrowLeft' || key === 'a' || key === 'A') && dir.x !== 1) {
+        nextDir = { x: -1, y: 0 };
+      } else if ((key === 'ArrowRight' || key === 'd' || key === 'D') && dir.x !== -1) {
+        nextDir = { x: 1, y: 0 };
+      }
+    }
+  });
+
+  // --- Управление кнопками (телефон) ---
+  var buttons = document.querySelectorAll('.btn[data-dir]');
+  for (var i = 0; i < buttons.length; i++) {
+    (function(btn) {
+      function handle(e) {
+        e.preventDefault();
+        var d = btn.getAttribute('data-dir');
+        if (!started) started = true;
+
+        if (d === 'up'    && dir.y !== 1)  nextDir = { x: 0,  y: -1 };
+        if (d === 'down'  && dir.y !== -1) nextDir = { x: 0,  y: 1  };
+        if (d === 'left'  && dir.x !== 1)  nextDir = { x: -1, y: 0  };
+        if (d === 'right' && dir.x !== -1) nextDir = { x: 1,  y: 0  };
+      }
+      btn.addEventListener('click', handle);
+      btn.addEventListener('touchstart', handle, { passive: false });
+    })(buttons[i]);
+  }
+
+  // --- Управление свайпами по canvas ---
+  var touchStartX = 0, touchStartY = 0;
+  canvas.addEventListener('touchstart', function(e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  canvas.addEventListener('touchend', function(e) {
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    var dy = e.changedTouches[0].clientY - touchStartY;
+    var absX = Math.abs(dx);
+    var absY = Math.abs(dy);
+
+    if (Math.max(absX, absY) < 20) {
+      if (!started) started = true;
+      return;
+    }
+
+    if (!started) started = true;
+
+    if (absX > absY) {
+      if (dx > 0 && dir.x !== -1) nextDir = { x: 1,  y: 0 };
+      else if (dx < 0 && dir.x !== 1) nextDir = { x: -1, y: 0 };
+    } else {
+      if (dy > 0 && dir.y !== -1) nextDir = { x: 0, y: 1 };
+      else if (dy < 0 && dir.y !== 1) nextDir = { x: 0, y: -1 };
+    }
+  }, { passive: true });
+
+  // --- Кнопка рестарта ---
+  document.getElementById('restartBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    init();
+  });
+
+  // --- Старт игры ---
+  init();
+})();
+</script>
+</body>
+</html>
